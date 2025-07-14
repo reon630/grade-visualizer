@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>成績グラフビジュアライザー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: #f3f4f6;
+      font-family: 'Segoe UI', 'Hiragino Sans', Arial, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      background: #fff;
+      max-width: 480px;
+      margin: 30px auto 0;
+      border-radius: 18px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.11);
+      padding: 32px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    h1 {
+      text-align: center;
+      font-weight: 600;
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+      color: #3a4151;
+    }
+    .form {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .form input, .form select {
+      flex: 2;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 1rem;
+      background: #f9fafb;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form input:focus, .form select:focus {
+      border-color: #5a8dee;
+    }
+    .form button {
+      flex: 1;
+      background: #5a8dee;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 0;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .form button:hover, .form button:focus {
+      background: #2f70d8;
+    }
+    table {
+      width: 100%;
+      margin-top: 12px;
+      border-collapse: collapse;
+      background: #f9fafb;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 8px 4px;
+      text-align: center;
+      border-bottom: 1px solid #ececec;
+    }
+    th {
+      background: #f1f3f6;
+      font-weight: 600;
+      color: #444;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    td button {
+      background: #f66;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 14px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    td button:hover {
+      background: #c23;
+    }
+    .chart-container {
+      width: 100%;
+      margin: 0 auto;
+      padding: 16px 0 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 15px 2vw 16px; }
+      h1 { font-size: 1.1rem; }
+      .form input, .form select { font-size: 0.95rem; }
+      .form button { font-size: 0.95rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>成績グラフビジュアライザー</h1>
+    <div class="form">
+      <input type="text" id="subject" placeholder="授業名を入力" autocomplete="off">
+      <select id="grade">
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+        <option value="D">D</option>
+        <option value="F">F 不可</option>
+      </select>
+      <button id="addBtn">追加</button>
+    </div>
+    <table id="gradeTable">
+      <thead>
+        <tr><th>授業名</th><th>評価</th><th>削除</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="chart-container">
+      <canvas id="gradeChart" width="320" height="320"></canvas>
+    </div>
+  </div>
+  <script>
+    const subjectInput = document.getElementById("subject");
+    const gradeSelect = document.getElementById("grade");
+    const addBtn = document.getElementById("addBtn");
+    const tableBody = document.querySelector("#gradeTable tbody");
+    const chartCanvas = document.getElementById("gradeChart");
+
+    let grades = JSON.parse(localStorage.getItem("grades") || "[]");
+
+    function addEntry() {
+      const subject = subjectInput.value.trim();
+      const grade = gradeSelect.value;
+      if (!subject) {
+        alert("授業名を入力してください");
+        subjectInput.focus();
+        return;
+      }
+      grades.push({ subject, grade });
+      subjectInput.value = "";
+      saveAndRender();
+    }
+
+    function deleteEntry(index) {
+      grades.splice(index, 1);
+      saveAndRender();
+    }
+
+    function saveAndRender() {
+      localStorage.setItem("grades", JSON.stringify(grades));
+      renderTable();
+      renderChart();
+    }
+
+    function renderTable() {
+      tableBody.innerHTML = "";
+      grades.forEach((entry, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${entry.subject}</td>
+          <td>${entry.grade}</td>
+          <td><button onclick="deleteEntry(${index})">削除</button></td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function renderChart() {
+      const counts = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+      grades.forEach(entry => counts[entry.grade]++);
+      const chartData = {
+        labels: ["A", "B", "C", "D", "F"],
+        datasets: [{
+          label: '評価分布',
+          data: [counts.A, counts.B, counts.C, counts.D, counts.F],
+          backgroundColor: [
+            '#64b5f6', // A: 青
+            '#81c784', // B: 緑
+            '#ffd54f', // C: 黄
+            '#ffb74d', // D: オレンジ
+            '#](#)`
+
